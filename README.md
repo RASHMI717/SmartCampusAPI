@@ -233,7 +233,7 @@ In this implementation, full objects are returned to prioritise simplicity and r
 
 ---
 
-#### 2.2. Room Resource Implementation 
+#### 2.2.Room Deletion & Safety Logic 
 
 ##### Q: Is the DELETE operation idempotent in your implementation? Provide a detailed justification by describing what happens if a client mistakenly sends  the exact same DELETE request for a room multiple times.
 
@@ -324,7 +324,7 @@ A 404 indicates a missing endpoint, whereas 422 indicates a logical error in the
 
 ---
 
-#### 5.4. Room Resource Implementation 
+#### 5.4. The Global Safety Net 
 
 ##### Q: From a cybersecurity standpoint, explain the risks associated with exposing internal Java stack traces to external API consumers. What specific information could an attacker gather from such a trace?
 
