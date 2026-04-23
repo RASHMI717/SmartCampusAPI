@@ -298,7 +298,7 @@ Compared to defining all nested paths in a single controller, this pattern avoid
 
 ---
 
-### Part 4.2: Historical Data Management
+#### 4.2. Historical Data Management
 
 The API maintains a historical log of sensor readings using the nested endpoint /sensors/{sensorId}/readings.
 
@@ -307,6 +307,8 @@ The GET method retrieves all past readings associated with a sensor, enabling fu
 A key requirement is maintaining data consistency. When a new reading is added, the system updates the parent sensor’s currentValue field to reflect the latest reading.
 
 This ensures that the API provides both an accurate historical record and a consistent real-time representation of the sensor’s current state.
+
+---
 
 ### Part 5: Advanced Error Handling, Exception Mapping & Logging
 
