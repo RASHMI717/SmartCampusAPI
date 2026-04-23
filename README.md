@@ -17,12 +17,12 @@ The system follows REST principles:
 * JSON communication
 * Nested resource structure
 
-###  Resource Structure
+### Resource Structure
 
-/api/v1/rooms
-/api/v1/sensors
-/api/v1/sensors/{sensorId}
-/api/v1/sensors/{sensorId}/readings
+- /api/v1/rooms  
+- /api/v1/sensors  
+- /api/v1/sensors/{sensorId}  
+- /api/v1/sensors/{sensorId}/readings
 
 This reflects real-world relationships:
 
@@ -68,14 +68,14 @@ http://localhost:8080/api/v1
 
 ### 1. Create Sensor
 ```bash
-curl -X POST http://localhost:8080/api/v1/sensors \
--H "Content-Type: application/json" \
--d "{\"id\":\"S1\",\"type\":\"CO2\",\"status\":\"ACTIVE\",\"currentValue\":300,\"roomId\":\"LIB-301\"}"
+curl -X POST "http://localhost:8080/api/v1/sensors" \
+  -H "Content-Type: application/json" \
+  -d "{\"id\":\"S1\",\"type\":\"CO2\",\"status\":\"ACTIVE\",\"currentValue\":300,\"roomId\":\"LIB-301\"}"
 ```
 
 ### 2. Get All Sensors
 ```bash
-curl http://localhost:8080/api/v1/sensors
+curl "http://localhost:8080/api/v1/sensors"
 ```
 
 ### 3. Filter Sensors by Type
@@ -85,26 +85,25 @@ curl "http://localhost:8080/api/v1/sensors?type=CO2"
 
 ### 4. Get Sensor by ID
 ```bash
-curl http://localhost:8080/api/v1/sensors/S1
+curl "http://localhost:8080/api/v1/sensors/S1"
 ```
 
 ### 5. Add Sensor Reading
 ```bash
-curl -X POST http://localhost:8080/api/v1/sensors/S1/readings \
--H "Content-Type: application/json" \
--d "{\"value\":25.5}"
+curl -X POST "http://localhost:8080/api/v1/sensors/S1/readings" \
+  -H "Content-Type: application/json" \
+  -d "{\"value\":25.5}"
 ```
 
 ### 6. Get Sensor Readings
 ```bash
-curl http://localhost:8080/api/v1/sensors/S1/readings
+curl "http://localhost:8080/api/v1/sensors/S1/readings"
 ```
 
 ### 7. Delete Sensor
 ```bash
-curl -X DELETE http://localhost:8080/api/v1/sensors/S1
+curl -X DELETE "http://localhost:8080/api/v1/sensors/S1"
 ```
-
 ---
 
 ## 5. API Design Explanation
