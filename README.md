@@ -193,11 +193,23 @@ Logging is implemented using filters:
 ##### Q: In your report, explain the default lifecycle of a JAX-RS Resource class. Is a new instance instantiated for every incoming request, or does the runtime treat it as a singleton? Elaborate on how this architectural decision impacts the way you manage and synchronize your in-memory data structures (maps/lists) to prevent data loss or race conditions.
 
 
-In JAX-RS, resource classes are typically **request-scoped**, meaning a new instance is created for each incoming HTTP request.
+In JAX-RS, resource classes are typically request-scoped, meaning a new instance is created for each incoming HTTP request.
 
-This design prevents shared state issues and improves thread safety. However, since this project uses in-memory data structures (such as HashMaps and Lists), these must be stored in a shared static class (e.g., DataStore).
+In this Smart Campus API, this behaviour ensures that:
 
-From a concurrency perspective, this design avoids accidental data overwrites between requests, but in a real-world system, additional synchronization mechanisms would be required to prevent race conditions when multiple users access or modify shared data simultaneously.
+- Each request is handled independently
+- There is no unintended shared state between requests
+- Thread safety is improved automatically
+
+However, since this project uses in-memory data structures (e.g., HashMap, ArrayList), storing them inside resource classes would result in data loss, because each request gets a new object.
+
+To solve this, the API uses a shared static data store (e.g., DataStore class) where all Rooms, Sensors, and Readings are stored.
+
+This design ensures:
+
+- Data persistence across requests
+- Avoidance of race conditions
+- Safe concurrent access to shared data
 
 ---
 
@@ -205,14 +217,25 @@ From a concurrency perspective, this design avoids accidental data overwrites be
 
 ##### Q: Why is the provision of ”Hypermedia” (links and navigation within responses) considered a hallmark of advanced RESTful design (HATEOAS)? How does this approach benefit client developers compared to static documentation?
 
-Hypermedia (HATEOAS) allows APIs to include navigational links within responses, enabling clients to dynamically discover available actions.
+Hypermedia (HATEOAS) allows the API to include navigational links inside responses, enabling clients to dynamically discover available actions.
 
-This is considered a hallmark of advanced RESTful design because:
-- It reduces tight coupling between client and server
-- Clients do not need hardcoded endpoint knowledge
-- Improves adaptability when APIs evolve
+In this API, the Discovery endpoint (`GET /api/v1`) provides:
 
-Compared to static documentation, HATEOAS provides a **self-describing API**, improving developer experience and reducing integration errors.
+- API version information
+- Contact details
+- Links to resources such as `/rooms` and `/sensors`
+
+This approach benefits clients because:
+
+- They do not need hardcoded URLs
+- They can dynamically navigate the API
+- The API becomes self-descriptive and easier to use
+
+Compared to static documentation, HATEOAS improves:
+
+- Flexibility
+- Maintainability
+- Client adaptability
 
 ---
 
@@ -223,13 +246,24 @@ Compared to static documentation, HATEOAS provides a **self-describing API**, im
 ##### Q: When returning a list of rooms, what are the implications of returning only IDs versus returning the full room objects? Consider network bandwidth and client side processing.
 
 
-Returning only IDs reduces payload size and improves network efficiency, especially in large datasets.
+When returning a list of rooms, there are two approaches:
 
-However, this increases the number of API calls required by the client to retrieve full details.
+**Returning only IDs:**
+- Reduces payload size
+- Improves network performance
+- Requires additional requests to fetch details
 
-Returning full objects increases response size but improves usability by reducing additional requests.
+**Returning full objects (used in this API):**
+- Provides complete information in one response
+- Reduces the need for multiple API calls
+- Improves usability for clients
 
-In this implementation, full objects are returned to prioritise simplicity and reduce client-side complexity, which is suitable for this system scale.
+In this API, full room objects are returned because:
+
+- The dataset is small (in-memory)
+- It simplifies client-side processing
+
+This design balances performance and usability effectively.
 
 ---
 
@@ -237,13 +271,26 @@ In this implementation, full objects are returned to prioritise simplicity and r
 
 ##### Q: Is the DELETE operation idempotent in your implementation? Provide a detailed justification by describing what happens if a client mistakenly sends  the exact same DELETE request for a room multiple times.
 
-DELETE is considered idempotent because performing the same request multiple times results in the same final system state.
+The DELETE operation is idempotent, meaning repeated requests produce the same result.
 
-In this implementation:
-- The first DELETE removes the room
-- Subsequent DELETE requests return 404 (resource not found)
+In this API:
 
-Even though the response differs, the system state remains unchanged, satisfying idempotency principles.
+**Case 1: First DELETE request**
+- Room is successfully deleted
+- Returns 200 OK
+
+**Case 2: Repeated DELETE request**
+- Room no longer exists
+- Returns 404 Not Found
+
+Even though the responses differ, the final system state remains unchanged, which satisfies idempotency.
+
+Additionally, the API enforces a business rule:
+
+- If a room contains sensors → deletion is blocked
+- Returns 409 Conflict
+
+This ensures data integrity and prevents orphaned sensors.
 
 ---
 
@@ -253,11 +300,23 @@ Even though the response differs, the system state remains unchanged, satisfying
 
 ##### Q: We explicitly use the @Consumes (MediaType.APPLICATION_JSON) annotation on the POST method. Explain the technical consequences if a client attempts to send data in a different format, such as text/plain or application/xml. How does JAX-RS handle this mismatch?
 
-The @Consumes(MediaType.APPLICATION_JSON) annotation specifies that the API only accepts request bodies in JSON format. In this project, it is applied at the class level in both SensorResource and SensorReadingResource, ensuring that all POST operations require JSON input.
+The `@Consumes(MediaType.APPLICATION_JSON)` annotation ensures that API endpoints only accept JSON input.
 
-If a client sends a request with a different media type (e.g., text/plain or XML), the JAX-RS runtime automatically rejects the request and returns HTTP 415 (Unsupported Media Type), without executing the resource method.
+In this API, it is used in:
 
-This behaviour enforces strict input validation, improves data consistency, and prevents invalid data formats from being processed by the API.
+- `POST /api/v1/sensors`
+- `POST /api/v1/sensors/{sensorId}/readings`
+
+If a client sends data in another format (e.g., XML or plain text), JAX-RS:
+
+- Automatically rejects the request
+- Returns HTTP 415 – Unsupported Media Type
+
+This guarantees:
+
+- Consistent data format
+- Easier parsing and validation
+- Improved API reliability
 
 ---
 
@@ -265,18 +324,30 @@ This behaviour enforces strict input validation, improves data consistency, and 
 
 ##### Q: You implemented this filtering using @QueryParam. Contrast this with an alternative design where the type is part of the URL path (e.g.,/api/vl/sensors/type/CO2). Why is the query  parameter approach generally considered superior for filtering and searching collections?
 
-Filtering is implemented using query parameters:
-/sensors?type=CO2
+Filtering in this API is implemented using query parameters:
 
-This is superior to path-based filtering such as:
-/sensors/type/CO2
+**Example:**
+```text
+GET /api/v1/sensors?type=CO2
+```
 
-Because:
-- Query parameters are designed for dynamic filtering
-- Easily support multiple filters (e.g., ?type=CO2&status=ACTIVE)
-- More flexible and scalable
+An alternative would be:
 
-Path parameters are better suited for identifying specific resources, not filtering collections.
+```text
+/api/v1/sensors/type/CO2
+```
+
+However, query parameters are preferred because:
+
+- They are designed for filtering and searching collections
+- They allow multiple filters (e.g., `?type=CO2&status=ACTIVE`)
+- They keep the API structure clean and flexible
+
+Path parameters are better suited for:
+
+- Identifying specific resources (e.g., `/sensors/{id}`)
+
+Thus, query parameters provide a more scalable and RESTful design.
 
 ---
 
@@ -298,17 +369,6 @@ Compared to defining all nested paths in a single controller, this pattern avoid
 
 ---
 
-#### 4.2. Historical Data Management
-
-The API maintains a historical log of sensor readings using the nested endpoint /sensors/{sensorId}/readings.
-
-The GET method retrieves all past readings associated with a sensor, enabling full historical tracking. The POST method appends new readings to this collection.
-
-A key requirement is maintaining data consistency. When a new reading is added, the system updates the parent sensor’s currentValue field to reflect the latest reading.
-
-This ensures that the API provides both an accurate historical record and a consistent real-time representation of the sensor’s current state.
-
----
 
 ### Part 5: Advanced Error Handling, Exception Mapping & Logging
 
@@ -316,11 +376,21 @@ This ensures that the API provides both an accurate historical record and a cons
 
 ##### Q: Why is HTTP 422 often considered more semantically accurate than a standard 404 when the issue is a missing reference inside a valid JSON payload?
 
-HTTP 422 is more semantically accurate when:
-- The request format is correct
-- But contains invalid data (e.g., non-existent roomId)
+When creating a sensor with a non-existent room:
 
-A 404 indicates a missing endpoint, whereas 422 indicates a logical error in the request content.
+- The request structure is valid
+- But the referenced resource does not exist
+
+In this case, the API returns:
+
+**422 Unprocessable Entity**
+
+This is more accurate than 404 because:
+
+- 404 applies to missing endpoints
+- 422 applies to invalid data inside a valid request
+
+Thus, 422 provides better semantic meaning.
 
 ---
 
@@ -328,15 +398,25 @@ A 404 indicates a missing endpoint, whereas 422 indicates a logical error in the
 
 ##### Q: From a cybersecurity standpoint, explain the risks associated with exposing internal Java stack traces to external API consumers. What specific information could an attacker gather from such a trace?
 
-Exposing stack traces can reveal:
-- Internal class structures
+Exposing raw stack traces can reveal:
+
+- Internal class names
 - File paths
 - Library versions
-- Application logic
+- Application structure
 
-Attackers can use this information to identify vulnerabilities and exploit the system.
+Attackers can use this information to:
 
-Therefore, the API returns generic error messages to protect internal implementation details.
+- Identify vulnerabilities
+- Perform targeted attacks
+
+To prevent this, the API uses:
+
+- A global exception mapper
+- Returns a generic 500 Internal Server Error
+- Hides internal details
+
+This improves API security.
 
 ---
 
@@ -344,11 +424,21 @@ Therefore, the API returns generic error messages to protect internal implementa
 
 ##### Q: Why is it advantageous to use JAX-RS filters for cross-cutting concerns like logging, rather than manually inserting Logger.info() statements inside every single resource method?
 
-Using JAX-RS filters allows centralized handling of cross-cutting concerns like logging.
+The API uses JAX-RS filters:
 
-Advantages include:
-- Avoids repetitive logging code in each method
-- Ensures consistent logging across all endpoints
-- Improves maintainability and scalability
+- `ContainerRequestFilter`
+- `ContainerResponseFilter`
 
-Compared to manual logging, filters provide a cleaner and more efficient design.
+These log:
+
+- Incoming requests (method + URI)
+- Outgoing responses (status code)
+
+Advantages over manual logging:
+
+- Centralized logging logic
+- No code duplication
+- Cleaner resource classes
+- Easier maintenance
+
+Thus, filters are ideal for cross-cutting concerns like logging.
